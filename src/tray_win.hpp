@@ -32,7 +32,6 @@ private:
     HWND hWnd;
     WNDCLASSEX wc;
     HMENU hmain_menu = NULL;
-    const char *icon = "icon.ico";
     static LRESULT CALLBACK _tray_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
     void (*leftclick_callback)();
@@ -41,7 +40,7 @@ private:
     HMENU make_menu( std::vector<tray_menu> *menu, UINT *id);
 
     tray_menu* find_parent(char* parent, std::vector<tray_menu> &menu);
-    HMENU Tray::create_menu_item(HMENU *menu, struct tray_menu &m, UINT *id);
+    HMENU create_menu_item(HMENU *menu, struct tray_menu &m, UINT *id);
 public:
     Tray(void (*leftclick_callback)() = NULL);
     ~Tray();
@@ -87,46 +86,6 @@ Tray::Tray(void (*_leftclick_callback)()) : leftclick_callback(_leftclick_callba
     update();
 }
 
-void Tray::menu_add_item(char* text, void (*callback)(struct tray_menu *), int disabled, int checked)
-{
-    tray_menu item;
-
-    item.text = text;
-    item.disabled = disabled;
-    item.checked = checked;
-    item.callback = callback;
-    main_menu.emplace_back(item);
-    update();
-}
-
-tray_menu* Tray::find_parent(char* parent, std::vector<tray_menu> &menu)
-{
-    for (auto &m : menu)
-    {
-        if (strcmp(m.text, parent) == 0) {
-            return &m;
-        }
-        if (m.submenu.size() > 0) {
-            auto s = find_parent(parent, m.submenu);
-            if (s != NULL) { return s; }
-        }
-    }
-    return NULL;
-}
-
-void Tray::menu_add_subitem(char* parent, char* text, void (*callback)(struct tray_menu *), int disabled, int checked)
-{
-    tray_menu* submenu = find_parent(parent, main_menu);
-    
-    tray_menu item;
-    item.text = text;
-    item.disabled = disabled;
-    item.checked = checked;
-    item.callback = callback;
-    submenu->submenu.emplace_back(item);
-    update();
-}
-
 void Tray::set_icon(const char* icon_path)
 {
     HICON icon;
@@ -152,6 +111,47 @@ void Tray::update()
     }
 
 }
+
+void Tray::menu_add_item(char* text, void (*callback)(struct tray_menu *), int disabled, int checked)
+{
+    tray_menu item;
+
+    item.text = text;
+    item.disabled = disabled;
+    item.checked = checked;
+    item.callback = callback;
+    main_menu.emplace_back(item);
+    update();
+}
+
+void Tray::menu_add_subitem(char* parent, char* text, void (*callback)(struct tray_menu *), int disabled, int checked)
+{
+    tray_menu* submenu = find_parent(parent, main_menu);
+    
+    tray_menu item;
+    item.text = text;
+    item.disabled = disabled;
+    item.checked = checked;
+    item.callback = callback;
+    submenu->submenu.emplace_back(item);
+    update();
+}
+
+tray_menu* Tray::find_parent(char* parent, std::vector<tray_menu> &menu)
+{
+    for (auto &m : menu)
+    {
+        if (strcmp(m.text, parent) == 0) {
+            return &m;
+        }
+        if (m.submenu.size() > 0) {
+            auto s = find_parent(parent, m.submenu);
+            if (s != NULL) { return s; }
+        }
+    }
+    return NULL;
+}
+
 
 int Tray::loop()
 {
