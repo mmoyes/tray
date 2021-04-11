@@ -1,8 +1,13 @@
 #include <iostream>
 #include <filesystem> // for icon path
 
+#ifdef _WIN32
 #include "tray_win.hpp"
-
+#elif __linux__
+#include "tray_lin.hpp"
+#else
+#include "tray_mac.hpp"
+#endif
 
 static void hello(struct tray::tray_menu *item) {
     std::cout << "FUNCTION: " << item->text << std::endl;
