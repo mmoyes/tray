@@ -63,17 +63,17 @@ Tray::Tray(void (*_leftclick_callback)()) : leftclick_callback(_leftclick_callba
     wc.hInstance = GetModuleHandle(NULL);
     wc.lpszClassName = WC_TRAY_CLASS_NAME;
     if (!RegisterClassEx(&wc)) {
-        throw std::exception( "RegisterClassEx" );
+        throw std::runtime_error( "RegisterClassEx" );
     }
 
     hWnd = CreateWindowEx(0, WC_TRAY_CLASS_NAME, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     if (hWnd == NULL) {
-        throw std::exception( "CreateWindowEx" );
+        throw std::runtime_error( "CreateWindowEx" );
     }
     SetLastError(0);
     SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
     if (GetLastError() != 0)
-        throw std::exception( "SetWindowLongPtr" );
+        throw std::runtime_error( "SetWindowLongPtr" );
     UpdateWindow(hWnd);    
 
     memset(&nid, 0, sizeof(nid));
