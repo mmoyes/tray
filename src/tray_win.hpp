@@ -12,11 +12,20 @@
 #define WC_TRAY_CLASS_NAME "TRAY"
 #define ID_TRAY_FIRST 1000
 
+#ifdef TRAY_USE_WCHAR
+#include <wchar.h>
+typedef wchar_t ostext;
+#define OSTEXT_COMPARE wcscmp
+#else
+typedef char ostext;
+#define OSTEXT_COMPARE strcmp
+#endif
+
 namespace tray
 {
 
 struct tray_menu {
-    LPSTR text;
+    ostext * text;
     int disabled = 0;
     int checked = 0;
 
@@ -39,7 +48,7 @@ private:
     std::vector< tray_menu  > main_menu;
     HMENU make_menu( std::vector<tray_menu> *menu, UINT *id);
 
-    tray_menu* find_parent(char* parent, std::vector<tray_menu> &menu);
+    tray_menu* find_parent(ostext* parent, std::vector<tray_menu> &menu);
     HMENU create_menu_item(HMENU *menu, struct tray_menu &m, UINT *id);
 public:
     Tray(void (*leftclick_callback)() = NULL);
@@ -47,10 +56,10 @@ public:
     void update();
     int loop();
 
-    void set_icon(const char* icon_path);
+    void set_icon(const ostext* icon_path);
 
-    void menu_add_item(char* text, void (*callback)(struct tray_menu *) = NULL, int disabled = 0, int checked = 0);
-    void menu_add_subitem(char* parent, char* text, void (*callback)(struct tray_menu *) = NULL, int disabled = 0, int checked = 0);  
+    void menu_add_item(ostext* text, void (*callback)(struct tray_menu *) = NULL, int disabled = 0, int checked = 0);
+    void menu_add_subitem(ostext* parent, ostext* text, void (*callback)(struct tray_menu *) = NULL, int disabled = 0, int checked = 0);  
 };
 
 Tray::Tray(void (*_leftclick_callback)()) : leftclick_callback(_leftclick_callback)
@@ -60,12 +69,12 @@ Tray::Tray(void (*_leftclick_callback)()) : leftclick_callback(_leftclick_callba
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.lpfnWndProc = _tray_wnd_proc;
     wc.hInstance = GetModuleHandle(NULL);
-    wc.lpszClassName = WC_TRAY_CLASS_NAME;
+    wc.lpszClassName = (LPWSTR) WC_TRAY_CLASS_NAME;
     if (!RegisterClassEx(&wc)) {
         throw std::runtime_error( "RegisterClassEx" );
     }
 
-    hWnd = CreateWindowEx(0, WC_TRAY_CLASS_NAME, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    hWnd = CreateWindowEx(0, (LPWSTR) WC_TRAY_CLASS_NAME, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     if (hWnd == NULL) {
         throw std::runtime_error( "CreateWindowEx" );
     }
@@ -86,10 +95,10 @@ Tray::Tray(void (*_leftclick_callback)()) : leftclick_callback(_leftclick_callba
     update();
 }
 
-void Tray::set_icon(const char* icon_path)
+void Tray::set_icon(const ostext* icon_path)
 {
     HICON icon;
-    ExtractIconEx(icon_path, 0, NULL, &icon, 1);
+    ExtractIconEx((LPWSTR) icon_path, 0, NULL, &icon, 1);
     if (nid.hIcon) {
     DestroyIcon(nid.hIcon);
     }
@@ -112,7 +121,7 @@ void Tray::update()
 
 }
 
-void Tray::menu_add_item(char* text, void (*callback)(struct tray_menu *), int disabled, int checked)
+void Tray::menu_add_item(ostext* text, void (*callback)(struct tray_menu *), int disabled, int checked)
 {
     tray_menu item;
 
@@ -124,7 +133,7 @@ void Tray::menu_add_item(char* text, void (*callback)(struct tray_menu *), int d
     update();
 }
 
-void Tray::menu_add_subitem(char* parent, char* text, void (*callback)(struct tray_menu *), int disabled, int checked)
+void Tray::menu_add_subitem(ostext* parent, ostext* text, void (*callback)(struct tray_menu *), int disabled, int checked)
 {
     tray_menu* submenu = find_parent(parent, main_menu);
     
@@ -137,11 +146,11 @@ void Tray::menu_add_subitem(char* parent, char* text, void (*callback)(struct tr
     update();
 }
 
-tray_menu* Tray::find_parent(char* parent, std::vector<tray_menu> &menu)
+tray_menu* Tray::find_parent(ostext* parent, std::vector<tray_menu> &menu)
 {
     for (auto &m : menu)
     {
-        if (strcmp(m.text, parent) == 0) {
+        if (OSTEXT_COMPARE(m.text, parent) == 0) {
             return &m;
         }
         if (m.submenu.size() > 0) {
@@ -226,8 +235,12 @@ HMENU Tray::make_menu( std::vector<tray_menu> *menu, UINT *id) {
 }
 
 HMENU Tray::create_menu_item(HMENU *menu, tray_menu &m, UINT *id) {
-    if (strcmp(m.text, "-") == 0) {
-        InsertMenu(*menu, *id, MF_SEPARATOR, TRUE, "");
+    #ifdef TRAY_USE_WCHAR
+    if (OSTEXT_COMPARE(m.text, L"-") == 0) {
+    #else
+    if (OSTEXT_COMPARE(m.text, "-") == 0) {
+    #endif
+        InsertMenu(*menu, *id, MF_SEPARATOR, TRUE, (LPWSTR)"");
     } else {
         MENUITEMINFO item;
         memset(&item, 0, sizeof(item));
@@ -244,7 +257,7 @@ HMENU Tray::create_menu_item(HMENU *menu, tray_menu &m, UINT *id) {
         if (m.disabled) { item.fState |= MFS_DISABLED; }
         if (m.checked) { item.fState |= MFS_CHECKED; }
         item.wID = *id;
-        item.dwTypeData = m.text;
+        item.dwTypeData = (LPWSTR) m.text;
         item.dwItemData = (ULONG_PTR) &m;
 
         InsertMenuItem(*menu, *id, TRUE, &item);
@@ -263,7 +276,7 @@ Tray::~Tray()
         DestroyMenu(hmain_menu);
     }
     PostQuitMessage(0);
-    UnregisterClass(WC_TRAY_CLASS_NAME, GetModuleHandle(NULL));    
+    UnregisterClass((LPWSTR)WC_TRAY_CLASS_NAME, GetModuleHandle(NULL));    
 }
 
 void quit() {
