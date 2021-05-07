@@ -29,7 +29,7 @@ struct tray_menu {
     int disabled = 0;
     int checked = 0;
 
-    void (*callback)(struct tray_menu *);
+    void (*callback)(struct tray_menu *, ULONG64 context);
 
     std::vector<tray_menu> submenu;
 };
@@ -41,6 +41,7 @@ private:
     HWND hWnd;
     WNDCLASSEX wc;
     HMENU hmain_menu = NULL;
+    ULONG64 context = NULL;
     static LRESULT CALLBACK _tray_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
     void (*leftclick_callback)();
@@ -50,6 +51,7 @@ private:
 
     tray_menu* find_parent(ostext* parent, std::vector<tray_menu> &menu);
     HMENU create_menu_item(HMENU *menu, struct tray_menu &m, UINT *id);
+    
 public:
     Tray(void (*leftclick_callback)() = NULL);
     ~Tray();
@@ -57,9 +59,10 @@ public:
     int loop();
 
     void set_icon(const ostext* icon_path);
+    void set_global_context(ULONG64 global_context);
 
-    void menu_add_item(ostext* text, void (*callback)(struct tray_menu *) = NULL, int disabled = 0, int checked = 0);
-    void menu_add_subitem(ostext* parent, ostext* text, void (*callback)(struct tray_menu *) = NULL, int disabled = 0, int checked = 0);  
+    void menu_add_item(ostext* text, void (*callback)(struct tray_menu *, ULONG64 context) = NULL, int disabled = 0, int checked = 0);
+    void menu_add_subitem(ostext* parent, ostext* text, void (*callback)(struct tray_menu *, ULONG64 context) = NULL, int disabled = 0, int checked = 0);  
 };
 
 Tray::Tray(void (*_leftclick_callback)()) : leftclick_callback(_leftclick_callback)
@@ -106,6 +109,11 @@ void Tray::set_icon(const ostext* icon_path)
     Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
 
+void Tray::set_global_context(ULONG64 _global_context)
+{
+    context = _global_context;
+}
+
 void Tray::update()
 {
     HMENU prevmenu = hmain_menu;
@@ -121,7 +129,7 @@ void Tray::update()
 
 }
 
-void Tray::menu_add_item(ostext* text, void (*callback)(struct tray_menu *), int disabled, int checked)
+void Tray::menu_add_item(ostext* text, void (*callback)(struct tray_menu *, ULONG64 context), int disabled, int checked)
 {
     tray_menu item;
 
@@ -133,7 +141,7 @@ void Tray::menu_add_item(ostext* text, void (*callback)(struct tray_menu *), int
     update();
 }
 
-void Tray::menu_add_subitem(ostext* parent, ostext* text, void (*callback)(struct tray_menu *), int disabled, int checked)
+void Tray::menu_add_subitem(ostext* parent, ostext* text, void (*callback)(struct tray_menu *, ULONG64 context), int disabled, int checked)
 {
     tray_menu* submenu = find_parent(parent, main_menu);
     
@@ -213,7 +221,7 @@ LRESULT CALLBACK Tray::_tray_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM
         if (GetMenuItemInfo(pThis->hmain_menu, wparam, FALSE, &item)) {
             struct tray_menu *menu = (struct tray_menu *)item.dwItemData;
             if (menu != NULL && menu->callback != NULL) {
-                menu->callback(menu);
+                menu->callback(menu, pThis->context);
                 pThis->update();
             }
         }
